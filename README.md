@@ -5,6 +5,9 @@
 ![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?logo=sqlite&logoColor=white)
 ![Local-first](https://img.shields.io/badge/Privacy-Local--first-success)
 ![AI-powered](https://img.shields.io/badge/OpenAI-Relevance%20%26%20skills-purple)
+[![GitHub](https://img.shields.io/badge/GitHub-zayzyyazy%2Fjob--pipeline-181717?logo=github)](https://github.com/zayzyyazy/job-pipeline)
+
+**Repository:** [https://github.com/zayzyyazy/job-pipeline](https://github.com/zayzyyazy/job-pipeline)
 
 **An AI-powered, local-first job research assistant that turns Gmail job alerts into structured, researched opportunities—not just another inbox summary.**
 
@@ -90,7 +93,7 @@ _No screenshots are bundled here; add your own captures under `.github/` or `doc
 ### 1. Clone
 
 ```bash
-git clone https://github.com/<you>/job-pipeline.git
+git clone https://github.com/zayzyyazy/job-pipeline.git
 cd job-pipeline
 ```
 
