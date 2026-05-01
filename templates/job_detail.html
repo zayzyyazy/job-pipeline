@@ -1,0 +1,328 @@
+{% extends 'base.html' %}
+{% block content %}
+{% if job.missing_posting_warning %}
+<section class="panel warn-banner">
+    <strong>Full job posting not found.</strong> This analysis is based only on the email. Use “Research real job posting” or paste the employer description below — the AI does not treat Gmail as a verified job description.
+</section>
+{% endif %}
+
+{% if job.is_deleted %}
+<section class="panel warn-banner muted-deleted">
+    <strong>In recycle bin.</strong>
+    <form class="inline-form restore-form" method="post" action="{{ url_for('restore_job_route', job_id=job.id) }}">
+        <button type="submit" class="btn btn-solid xs">Restore job</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="panel detail-hero">
+    <div class="hero-top">
+        <div>
+            <p class="eyebrow">{% if job.pinned_flag %}Pinned • {% endif %}{{ job.source or 'Unknown source' }}</p>
+            <h2 class="detail-title">{{ job.display_title }}</h2>
+            <p class="muted compact">{{ job.ai_company }}</p>
+        </div>
+        <div class="hero-actions">
+            <span class="status-chip">{{ job.status }}</span>
+            <span class="badge sq {{ job.sq_class }}">{{ job.sq_label }}</span>
+            {% if not job.is_deleted %}
+            <form method="post" action="{{ url_for('toggle_pin_route', job_id=job.id) }}" class="inline-form">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="btn btn-ghost xs" type="submit">{% if job.pinned_flag %}Unpin{% else %}Pin{% endif %}</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <div class="hero-grid condensed">
+        <div>
+            <span class="muted label">Office / location</span>
+            <div>{{ job.ai_location or job.location or '—' }}</div>
+        </div>
+        <div>
+            <span class="muted label">Target fit</span>
+            <div>
+                <span class="badge fit-{{ (job.target_fit or 'na')|lower }}">{{ job.target_fit or '—' }}</span>
+                {% if job.target_score is not none %}
+                <span class="muted small"> · {{ job.target_score }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <span class="muted label">NRW focus</span>
+            <div><span class="badge {{ job.location_badge }}">{{ (job.location_fit or 'unclear') | replace('_', ' ') }}</span></div>
+        </div>
+    </div>
+</section>
+
+{% if not job.is_deleted %}
+<section class="panel research-panel">
+    <h3>Research real job posting</h3>
+    <p class="muted small">Searches employer and ATS pages (not Gmail). May be rate-limited by the search provider.</p>
+    <form method="post" action="{{ url_for('research_job_posting_route', job_id=job.id) }}" class="inline-form">
+        <button class="btn btn-primary slim" type="submit">Research real job posting</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="panel links-panel">
+    <h3>Open job links</h3>
+    <div class="link-actions">
+        <div>
+            <p class="muted small tight">Tracked link</p>
+            {% if job.job_link_broken %}
+                <p class="warn-inline">Stored link looks invalid or not openable.</p>
+            {% endif %}
+            {% if job.href_job_link %}
+                <div class="link-row">
+                    <a class="btn btn-solid xs" href="{{ job.href_job_link }}" target="_blank" rel="noopener noreferrer">Open job link</a>
+                    {% if job.copy_job_link_value %}
+                    <button type="button" class="btn btn-ghost xs" data-copy="{{ job.copy_job_link_value }}">Copy link</button>
+                    {% endif %}
+                </div>
+            {% elif not job.job_link_present %}
+                <p class="muted tiny">No stored job link.</p>
+            {% endif %}
+        </div>
+        <div>
+            <p class="muted small tight">Discovered employer page</p>
+            {% if job.discovered_link_broken %}
+                <p class="warn-inline">Discovered URL could not be normalized for opening.</p>
+            {% endif %}
+            {% if job.href_discovered %}
+                <div class="link-row">
+                    <a class="btn btn-solid xs" href="{{ job.href_discovered }}" target="_blank" rel="noopener noreferrer">Open discovered page</a>
+                    {% if job.copy_discovered_value %}
+                    <button type="button" class="btn btn-ghost xs" data-copy="{{ job.copy_discovered_value }}">Copy discovered link</button>
+                    {% endif %}
+                </div>
+            {% elif not job.discovered_link_present %}
+                <p class="muted tiny">No discovered URL yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% if job.manual_paste_notice %}
+        <p class="muted compact note-callout"><strong>Manual paste used — no URL available.</strong> Copy/share must be done manually if you didn’t paste a link elsewhere.</p>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h3>AI summary</h3>
+    <p>{{ job.summary or '—' }}</p>
+</section>
+
+<details class="panel ai-debug-panel">
+    <summary class="ai-debug-summary"><strong>AI Debug (click to expand)</strong></summary>
+    <div class="ai-debug-body muted small">
+        <p><strong>source_quality:</strong> <code>{{ job.source_quality }}</code></p>
+        <p><strong>effective_source_quality:</strong> <code>{{ job.effective_source_quality }}</code></p>
+        <p><strong>required_skills count:</strong> {{ job.ai_debug_req_count }}</p>
+        <p><strong>nice_to_have count:</strong> {{ job.ai_debug_nice_count }}</p>
+        <p><strong>tools count:</strong> {{ job.ai_debug_tools_count }}</p>
+        <p><strong>combined description length:</strong> {{ job.ai_debug_desc_len }}</p>
+        <p><strong>fallback used:</strong> {{ 'yes' if job.ai_debug_fallback_used else 'no' }} (saved AI keyword_fallback / UI hydration)</p>
+    </div>
+</details>
+
+<section class="panel">
+    <h3>Why it is relevant</h3>
+    <p>{{ job.why_relevant or '—' }}</p>
+</section>
+
+<section class="panel">
+    <h3>Required skills</h3>
+    {% if job.required_skills_list and job.required_skills_list|length > 0 %}
+    <div class="chip-row">
+        {% for s in job.required_skills_list %}<span class="chip chip-req">{{ s }}</span>{% endfor %}
+    </div>
+    {% elif job.missing_posting_warning %}
+    <p class="muted">Unknown from email snapshot.</p>
+    {% else %}
+    <span class="warn-inline">No skills extracted</span>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h3>Nice-to-have skills</h3>
+    {% if job.nice_to_have_list and job.nice_to_have_list|length > 0 %}
+    <div class="chip-row">
+        {% for s in job.nice_to_have_list %}<span class="chip chip-nice">{{ s }}</span>{% endfor %}
+    </div>
+    {% else %}
+    <span class="warn-inline">No skills extracted</span>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h3>Tools &amp; technologies</h3>
+    {% if job.tools_list and job.tools_list|length > 0 %}
+    <div class="chip-row">
+        {% for s in job.tools_list %}<span class="chip chip-tool">{{ s }}</span>{% endfor %}
+    </div>
+    {% else %}
+    <span class="warn-inline">No skills extracted</span>
+    {% endif %}
+</section>
+
+<section class="panel focus-form">
+    <h3>Paste full posting (fallback)</h3>
+    <p class="muted small">Couldn’t find the posting? Paste it here. Optional URL fetch + paste; pasted text wins when both are present.</p>
+    <form method="post" action="{{ url_for('improve_posting', job_id=job.id) }}" class="manual-form">
+        <label>Job posting URL (optional)
+            <input type="url" name="job_url" placeholder="https://careers.example.com/job/123">
+        </label>
+        <label>Full job description
+            <textarea name="job_description" rows="8" placeholder="Paste the full description from the employer site…"></textarea>
+        </label>
+        <button class="btn btn-primary slim" type="submit">Update AI from pasted posting</button>
+    </form>
+    {% if not job.is_deleted %}
+    <form method="post" action="{{ url_for('force_ai_refresh_route', job_id=job.id) }}" class="manual-form slim-gap">
+        <p class="muted small">Rebuild the AI narrative from whatever text is stored on this job.</p>
+        <button class="btn btn-ghost slim" type="submit">Force re-run AI (ignore cache)</button>
+    </form>
+    {% endif %}
+</section>
+
+<section class="panel">
+    <h3>AI recommendation</h3>
+    <p>
+        {% set reco = (job.recommendation or 'review')|lower %}
+        <span class="reco reco-{{ reco if reco in ['apply','review','skip'] else 'review' }}">{{ job.recommendation or '—' }}</span>
+        {% if job.score is not none %}
+        <span class="muted small"> · Model score {{ job.score }}</span>
+        {% endif %}
+    </p>
+    <p class="muted small">{{ job.reasoning or '—' }}</p>
+</section>
+
+<section class="panel">
+    <h3>Category</h3>
+    <form method="post" action="{{ url_for('update_category_route', job_id=job.id) }}" class="category-form">
+        <label>Category
+            <select name="category" required>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == job.category %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="checkbox-field inline">
+            <input type="checkbox" name="category_lock" value="on" {% if job.category_locked_bool %}checked{% endif %}>
+            <span>Lock category from AI updates</span>
+        </label>
+        <button class="btn btn-solid" type="submit">Save category</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>Update workflow status</h3>
+    <form method="post" action="{{ url_for('set_job_status', job_id=job.id) }}" class="status-form">
+        <label>Status
+            <select name="status" required>
+                {% for status in statuses %}
+                <option value="{{ status }}" {% if status == job.status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Note (optional)
+            <input type="text" name="note" placeholder="Short note for timeline">
+        </label>
+        <button class="btn btn-solid" type="submit">Save status</button>
+    </form>
+</section>
+
+<details class="panel technical-details">
+    <summary>Technical details</summary>
+    <div class="details-body">
+        <section>
+            <h4>Automation / AI relevance</h4>
+            <p>{{ job.automation_ai_relevance or '—' }}</p>
+        </section>
+        <section>
+            <h4>Gmail signal</h4>
+            <p><strong>Subject:</strong> {{ job.email_subject or '—' }}</p>
+            <p><strong>Snippet:</strong> {{ job.email_snippet or '—' }}</p>
+        </section>
+        <section>
+            <h4>Email body preview</h4>
+            <pre class="email-snippet">{{ job.email_body_preview or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Parsed description (email parser)</h4>
+            <pre class="email-snippet">{{ job.description or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Source quality</h4>
+            <p><span class="badge sq {{ job.sq_class }}">{{ job.sq_label }}</span> <code>{{ job.source_quality }}</code></p>
+        </section>
+        <section>
+            <h4>Discovery status &amp; log</h4>
+            <p><span class="badge disc-{{ job.discovery_class }}">{{ job.discovery_label }}</span></p>
+            <p class="muted small">{{ job.discovery_reason or '—' }}</p>
+            <p class="muted small"><strong>Discovered URL:</strong> {{ job.discovered_url or '—' }}</p>
+            <p class="muted small"><strong>Source tag:</strong> {{ job.discovered_source or '—' }}</p>
+        </section>
+        <section>
+            <h4>AI inputs / debug</h4>
+            <p class="muted small">{{ job.enrichment_sources_used or '—' }}</p>
+        </section>
+        <section>
+            <h4>Downloaded page text (trimmed)</h4>
+            <pre class="email-snippet">{{ job.job_page_preview or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Discovered/posted text preview</h4>
+            <pre class="email-snippet">{{ job.discovered_preview or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Status history</h4>
+            <table>
+                <thead><tr><th>When</th><th>From</th><th>To</th><th>Note</th></tr></thead>
+                <tbody>
+                {% for item in history %}
+                    <tr><td>{{ item.changed_at }}</td><td>{{ item.old_status or '—' }}</td><td>{{ item.new_status }}</td><td>{{ item.note or '—' }}</td></tr>
+                {% else %}
+                    <tr><td colspan="4" class="muted">No history yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+</details>
+
+{% if not job.is_deleted %}
+<section class="panel danger-zone">
+    <h3>Delete job</h3>
+    <p class="muted small">Soft delete hides this card without touching Gmail payloads.</p>
+    <form method="post" action="{{ url_for('delete_job_route', job_id=job.id) }}" class="danger-form"
+          onsubmit="return confirm('Move this job to the recycle bin?');">
+        <button class="btn danger" type="submit">Delete job</button>
+    </form>
+</section>
+{% endif %}
+
+<script>
+(function () {
+  function notify(msg) {
+    try {
+      if (window.FlaskClipboardToast) window.FlaskClipboardToast(msg);
+    } catch (e) { /* noop */ }
+    alert(msg);
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var txt = btn.getAttribute('data-copy') || '';
+      if (!txt) return notify('Nothing to copy yet.');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(function () {
+          notify('Link copied to clipboard.');
+        }).catch(function () {
+          notify('Clipboard blocked — copy manually:\n\n' + txt);
+        });
+      } else {
+        notify('Clipboard API unavailable:\n\n' + txt);
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}

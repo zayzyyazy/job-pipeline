@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Job Pipeline</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <h1>Job Pipeline</h1>
+            <p class="muted subtle">NRW-focused • local SQLite</p>
+        </div>
+        <div class="sidebar-card">
+            <p class="eyebrow">Ingest</p>
+            <form action="{{ url_for('sync_emails') }}" method="post">
+                <button class="btn btn-primary wide" type="submit">Sync Gmail</button>
+            </form>
+        </div>
+        <div class="sidebar-card">
+            <p class="eyebrow">Refresh AI + discovery</p>
+            <form action="{{ url_for('reprocess_jobs') }}" method="post" class="mini-form">
+                <label class="muted" for="limit">Batch limit</label>
+                <input type="number" name="limit" id="limit" min="1" max="500" value="50">
+                <button class="btn btn-ghost wide" type="submit">Reprocess jobs</button>
+            </form>
+            <p class="muted hint">Keeps statuses, pins, locks, manual notes intact while recomputing fit + NRW tagging.</p>
+        </div>
+        <div class="sidebar-card muted small">
+            <p><strong>Desktop URL</strong></p>
+            <p>http://127.0.0.1:{{ flask_port }}</p>
+            <p class="hint">Matches the Flask dev server from <code>python app.py</code>.</p>
+        </div>
+        <div class="sidebar-card cleanup-card">
+            <p class="eyebrow">Maintenance</p>
+            <form method="post" action="{{ url_for('admin_cleanup') }}" class="danger-inline"
+                  onsubmit="return confirm('Soft-archive obviously noisy roles? Pins & Saved/Applied stay safe.');">
+                <button class="btn danger slim" type="submit">Cleanup low-quality</button>
+            </form>
+            <p class="hint">Moves tiny titles, outside/low-fit rows into the recycle bin—never destroys Gmail data.</p>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        </nav>
+    </aside>
+
+    <main class="main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-wrap">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

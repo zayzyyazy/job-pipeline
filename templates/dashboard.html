@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel sync-panel">
+    <div class="panel-head">
+        <h2>Pipeline overview</h2>
+        <p class="muted compact">Cards default to actionable NRW-friendly roles · expand with “Show everything”.</p>
+    </div>
+</section>
+
+<section class="panel filters-panel">
+    <h3 class="section-title">Filters</h3>
+    <form method="get" class="filters-grid" id="filter-form">
+        <label class="full-span">Search
+            <input type="search" name="q" value="{{ search_q }}" placeholder="Title, company, location, category, skills…">
+        </label>
+        <label>Status
+            <select name="status">
+                <option value="">All</option>
+                {% for status in statuses %}
+                <option value="{{ status }}" {% if status == status_filter %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Source
+            <select name="source">
+                <option value="">All</option>
+                {% for source in sources %}
+                <option value="{{ source }}" {% if source == source_filter %}selected{% endif %}>{{ source }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Target fit
+            <select name="target_fit">
+                <option value="">All</option>
+                {% for tf in target_fit_choices %}
+                <option value="{{ tf }}" {% if tf == target_fit_filter %}selected{% endif %}>{{ tf | capitalize }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Location fit
+            <select name="location_fit">
+                <option value="">All</option>
+                {% for lf in location_fit_choices %}
+                <option value="{{ lf }}" {% if lf == location_fit_filter %}selected{% endif %}>{{ lf|replace('_',' ') }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Category
+            <select name="category">
+                <option value="">All</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == category_filter %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Discovery
+            <select name="discovery_status">
+                <option value="">All</option>
+                {% for ds in discovery_choices %}
+                <option value="{{ ds }}" {% if ds == discovery_filter %}selected{% endif %}>{{ ds | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="checkbox-field">
+            <span>Pinned only</span>
+            <input type="checkbox" name="pinned_only" value="1" {% if pinned_only %}checked{% endif %}>
+        </label>
+        <label class="checkbox-field">
+            <span>Show deleted</span>
+            <input type="checkbox" name="show_deleted" value="1" {% if show_deleted %}checked{% endif %}>
+        </label>
+        <label class="checkbox-field relax-toggle">
+            <span>Show noisy / excluded roles</span>
+            <input type="checkbox" name="relax" value="1" {% if relaxed_view %}checked{% endif %}>
+        </label>
+        <div class="filter-actions">
+            <button class="btn btn-solid" type="submit">Apply</button>
+            <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Reset</a>
+        </div>
+        {% if strict_focus %}
+        <p class="muted tiny full-span hint-line">Showing strong/medium NRW-ish roles excluding Ignored. Check “Show noisy / excluded roles” or pick filters to widen.</p>
+        {% endif %}
+    </form>
+</section>
+
+<section class="panel cards-panel">
+    <div class="cards-head">
+        <h3>Jobs</h3>
+        <p class="muted compact">{{ jobs|length }} card(s){% if show_deleted %} • includes deleted{% endif %}</p>
+    </div>
+
+    {% if jobs %}
+    <div class="job-grid">
+        {% for job in jobs %}
+        <article class="job-card {{ job.card_tone }}{% if job.pinned_flag %} pinned-card{% endif %}{% if job.deleted_at %} deleted-card{% endif %}">
+            {% if job.pinned_flag %}<span class="pin-corner" aria-label="Pinned">📌</span>{% endif %}
+            <header class="card-top">
+                <div>
+                    <a class="title-link line-clamp" href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.title }}</a>
+                    <p class="muted company-clamp">{{ job.company or 'Company unknown' }}</p>
+                </div>
+                <span class="status-chip sm">{{ job.status }}</span>
+            </header>
+
+            <div class="meta-row">
+                <span class="muted label">Where</span>
+                <span class="meta-value line-clamp sm">{{ job.location or '—' }}</span>
+            </div>
+
+            <div class="meta-row slim-line">
+                <span class="badge {{ job.location_badge }}">{{ job.loc_fit_short }}</span>
+                <span class="badge fit-{{ (job.target_fit or 'na')|lower }}">{{ job.tgt_fit_display }}{% if job.tgt_score_display and job.tgt_score_display != '—' %} · {{ job.tgt_score_display }}{% endif %}</span>
+                <span class="chip skinny">{{ job.category_display }}</span>
+                <span class="badge sq {{ job.sq_class }}" title="Source quality">{{ job.sq_label }}</span>
+            </div>
+
+            <div class="meta-row reco-line">
+                <span class="reco reco-{{ job.reco_class }}">{{ job.reco_display }}</span>
+            </div>
+
+            <p class="skills-preview muted line-clamp sm">{{ job.skills_preview }}</p>
+
+            <footer class="card-actions split">
+                <div class="card-links">
+                    <a class="btn btn-solid ghost-like xs" href="{{ url_for('job_detail', job_id=job.id) }}">Open</a>
+                </div>
+                <div class="card-quick-forms">
+                    <form method="post" action="{{ url_for('quick_status', job_id=job.id) }}" class="inline-form">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <input type="hidden" name="status" value="Saved">
+                        <button type="submit" class="btn btn-quiet xs">Saved</button>
+                    </form>
+                    <form method="post" action="{{ url_for('quick_status', job_id=job.id) }}" class="inline-form">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <input type="hidden" name="status" value="Ignored">
+                        <button type="submit" class="btn btn-quiet xs">Ignored</button>
+                    </form>
+                    <form method="post" action="{{ url_for('toggle_pin_route', job_id=job.id) }}" class="inline-form">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button class="btn btn-quiet xs" type="submit">{% if job.pinned_flag %}Unpin{% else %}Pin{% endif %}</button>
+                    </form>
+                </div>
+            </footer>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h4>No jobs match these filters</h4>
+        <p class="muted">Enable “Show noisy / excluded roles” or clear filters.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
