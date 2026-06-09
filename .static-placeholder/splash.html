@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:* http://localhost:*;" />
+  <title>Starting — Job Pipeline</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; }
+    body {
+      display: grid;
+      place-items: center;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    .card {
+      text-align: center;
+      padding: clamp(28px, 5vw, 48px);
+      max-width: 480px;
+    }
+    h1 { margin: 0 0 8px; font-size: 1.25rem; font-weight: 600; }
+    p { margin: 0; color: #94a3b8; font-size: 0.92rem; line-height: 1.5; }
+    #status { margin-top: 14px; font-size: 0.85rem; color: #cbd5e1; min-height: 1.4em; }
+    .pulse {
+      margin: 20px auto 0;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid rgba(148, 163, 184, 0.25);
+      border-top-color: #38bdf8;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #err { margin-top: 20px; text-align: left; color: #fca5a5; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="pulse" aria-hidden="true"></div>
+    <h1>Starting Job Pipeline…</h1>
+    <p>Waiting for the local server on <strong>127.0.0.1</strong>. This usually takes a few seconds.</p>
+    <p id="status">Checking server…</p>
+    <pre id="err"></pre>
+  </div>
+  <script>
+    (function () {
+      window.__JOB_PIPELINE_BACKEND_ERROR__ = function (detail) {
+        var el = document.getElementById("err");
+        el.style.display = "block";
+        el.textContent = detail || "Could not start backend.";
+        var st = document.getElementById("status");
+        if (st) st.textContent = "Could not connect.";
+      };
+
+      function flaskPort() {
+        var p = window.__JOB_PIPELINE_FLASK_PORT__;
+        if (typeof p === "number" && p > 0 && p < 65536) return String(p);
+        var q = new URLSearchParams(location.search).get("port");
+        if (q && /^\d+$/.test(q)) return q;
+        return "5000";
+      }
+
+      function baseUrl() {
+        return "http://127.0.0.1:" + flaskPort() + "/";
+      }
+
+      function setStatus(t) {
+        var el = document.getElementById("status");
+        if (el) el.textContent = t;
+      }
+
+      var attempts = 0;
+      var maxAttempts = 180;
+
+      function tryHealth() {
+        attempts += 1;
+        var port = flaskPort();
+        setStatus("Polling http://127.0.0.1:" + port + "/health … (try " + attempts + ")");
+        if (attempts > maxAttempts) {
+          window.__JOB_PIPELINE_BACKEND_ERROR__(
+            "Timed out waiting for the backend. If you use a custom port, set FLASK_RUN_PORT before launch, or install dependencies in the bundled .venv (see sync script)."
+          );
+          return;
+        }
+        var url = "http://127.0.0.1:" + port + "/health";
+        fetch(url, { method: "GET", cache: "no-store" })
+          .then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
+          .then(function (j) {
+            if (j && j.ok === true) {
+              setStatus("Server ready — loading app…");
+              window.location.replace(baseUrl());
+              return;
+            }
+            throw new Error("Unexpected health payload");
+          })
+          .catch(function () {
+            setTimeout(tryHealth, 450);
+          });
+      }
+
+      window.addEventListener("job_pipeline_flask_port", function () {
+        setStatus("Port received — connecting…");
+      });
+
+      setTimeout(tryHealth, 120);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Add job manually</h2>
+            <p class="muted compact">
+                <strong>Either</strong> paste a full job description <strong>or</strong> paste a posting URL we can fetch.
+                Optional title/company/location sharpen the first pass. You do not need both URL and description if one is enough.
+            </p>
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-ghost">← Dashboard</a>
+    </div>
+
+    <form method="post" action="{{ url_for('manual_job_new') }}" class="manual-form slim-gap manual-intake-page-form">
+        <label>Job title <span class="muted tiny">(optional)</span>
+            <input type="text" name="job_title" value="{{ form_title }}" placeholder="e.g. Automation Specialist" autocomplete="off">
+        </label>
+        <label>Company <span class="muted tiny">(optional)</span>
+            <input type="text" name="company" value="{{ form_company }}" placeholder="Employer name" autocomplete="organization">
+        </label>
+        <label>Location <span class="muted tiny">(optional)</span>
+            <input type="text" name="location" value="{{ form_location }}" placeholder="City / Remote" autocomplete="off">
+        </label>
+        <label>Job posting URL <span class="muted tiny">(optional)</span>
+            <input type="url" name="job_url" value="{{ form_url }}" placeholder="https://..." inputmode="url" autocomplete="off">
+        </label>
+        <label class="full-span">Full job description <span class="muted tiny">(optional if URL works)</span>
+            <textarea name="full_description" rows="16" placeholder="Paste the entire job description, or leave blank when the URL above loads the posting…">{{ form_description }}</textarea>
+        </label>
+        <div class="manual-form-actions">
+            <button type="submit" class="btn btn-primary">Analyze and save job</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

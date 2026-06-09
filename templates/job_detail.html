@@ -1,0 +1,666 @@
+{% extends 'base.html' %}
+{% block content %}
+{% if job.missing_posting_warning %}
+<section class="panel warn-banner">
+    <strong>Full job posting not found.</strong> This analysis is based only on the email. Use “Research real job posting” or paste the employer description below — the AI does not treat Gmail as a verified job description.
+</section>
+{% endif %}
+
+{% if job.is_deleted %}
+<section class="panel warn-banner muted-deleted">
+    <strong>In recycle bin.</strong>
+    <form class="inline-form restore-form" method="post" action="{{ url_for('restore_job_route', job_id=job.id) }}">
+        <button type="submit" class="btn btn-solid xs">Restore job</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="panel detail-hero">
+    <div class="hero-top">
+        <div>
+            <p class="eyebrow">{% if job.pinned_flag %}Pinned • {% endif %}{{ job.source or 'Unknown source' }}</p>
+            <h2 class="detail-title">{{ job.display_title }}</h2>
+            <p class="muted compact">{{ job.display_company }}</p>
+        </div>
+        <div class="hero-actions">
+            <span class="status-chip">{{ job.status }}</span>
+            {% if job.needs_review_badge %}
+            <span class="badge needs-review-badge" title="Weak intake — confirm title, company, and posting">Needs review</span>
+            {% endif %}
+            <span class="badge sq {{ job.sq_class }}">{{ job.sq_label }}</span>
+            <span class="badge {{ job.freshness_class }}" title="Listing freshness hint">{{ job.freshness_label }}</span>
+            {% if not job.is_deleted %}
+            <form method="post" action="{{ url_for('toggle_pin_route', job_id=job.id) }}" class="inline-form">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button class="btn btn-ghost xs" type="submit">{% if job.pinned_flag %}Unpin{% else %}Pin{% endif %}</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    <div class="hero-grid condensed">
+        <div>
+            <span class="muted label">Location</span>
+            <div>{{ job.ai_location or job.location or '—' }}</div>
+        </div>
+        <div>
+            <span class="muted label">Match score</span>
+            <div>
+                {% if job.match_score_pct is not none %}
+                <strong>{{ job.match_score_pct }}%</strong>
+                {% if job.target_fit %}<span class="muted tiny"> · {{ (job.target_fit or '')|capitalize }}</span>{% endif %}
+                {% else %}
+                <span class="muted">—</span>
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <span class="muted label">Recommendation</span>
+            <div><span class="badge reco-{{ job.reco_ui_class }}">{{ job.header_reco_label }}</span></div>
+        </div>
+        <div>
+            <span class="muted label">NRW / region</span>
+            <div><span class="badge {{ job.location_badge }}">{{ (job.location_fit or 'unclear') | replace('_', ' ') }}</span></div>
+        </div>
+        <div>
+            <span class="muted label">Apply-by hint</span>
+            <div>{% if job.job_deadline_display %}<code class="deadline-pill">{{ job.job_deadline_display }}</code>{% else %}<span class="muted">—</span>{% endif %}</div>
+        </div>
+    </div>
+    <div class="hero-apply-bar">
+        {% if job.best_apply_href %}
+        <div class="link-row">
+            <button type="button" class="btn btn-solid xs" data-open-external="{{ job.best_apply_href }}">Open apply / job link</button>
+            {% if job.best_apply_copy_value %}
+            <button type="button" class="btn btn-ghost xs" data-copy="{{ job.best_apply_copy_value }}">Copy URL</button>
+            {% endif %}
+        </div>
+        {% else %}
+        <p class="muted small compact">No saved posting URL — use search below or add a link under “Links &amp; better text”.</p>
+        {% endif %}
+        <p class="hero-search-line muted small compact">
+            <code class="search-line-code">{{ job.job_search_copy_line }}</code>
+            <button type="button" class="btn btn-ghost xs" data-copy="{{ job.job_search_copy_line }}">Copy</button>
+        </p>
+    </div>
+</section>
+
+{% if job.show_improve_job_box and not job.is_deleted %}
+<section class="panel improve-job-callout" aria-labelledby="improve-job-heading">
+    <h3 id="improve-job-heading">Improve this job</h3>
+    <p class="muted compact">We only have an email snapshot. Paste the real job link or full description to get accurate skills and recommendation.</p>
+    <form method="post" action="{{ url_for('improve_posting', job_id=job.id) }}" class="manual-form improve-job-form">
+        <label>Job posting URL
+            <input type="url" name="job_url" placeholder="https://…" autocomplete="off">
+        </label>
+        <label>Full job description
+            <textarea name="job_description" rows="8" placeholder="Paste the employer posting text…"></textarea>
+        </label>
+        <button type="submit" class="btn btn-primary slim">Update job from link/description</button>
+    </form>
+</section>
+{% endif %}
+
+<section class="panel job-application-assistant">
+    <h3 class="assistant-panel-title">What this company does</h3>
+    <p class="assistant-lead">{{ job.company_does_line }}</p>
+
+    <h3 class="assistant-panel-title">What you would actually do</h3>
+    <ul class="skills-bullets assistant-task-list">
+        {% for t in job.actually_do_bullets %}
+        <li>{{ t }}</li>
+        {% endfor %}
+    </ul>
+
+    <h3 class="assistant-panel-title">Skills &amp; tools</h3>
+    <div class="assistant-skills-grid">
+        <div class="assistant-skills-col">
+            <h4 class="assistant-subhead">Required</h4>
+            {% if job.required_skills_list and job.required_skills_list|length > 0 %}
+            <p class="muted tiny" style="margin-top:6px">
+                You match {{ job.matched_skills_count }} / {{ job.required_skills_count }} required skills
+            </p>
+            <ul class="skills-bullets tight">
+                {% for s in job.required_skills_list %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+            {% elif job.skills_path_explanation %}
+            <p class="muted tiny">{{ job.skills_path_explanation }}</p>
+            {% else %}
+            <p class="muted tiny">—</p>
+            {% endif %}
+        </div>
+        <div class="assistant-skills-col">
+            <h4 class="assistant-subhead">Tools / stack</h4>
+            {% if job.tools_list and job.tools_list|length > 0 %}
+            <ul class="skills-bullets tight">
+                {% for s in job.tools_list %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+            {% if job.tool_explanations and job.tool_explanations|length > 0 %}
+            <ul class="tool-explain-list">
+                {% for t in job.tool_explanations %}<li>{{ t }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+            {% else %}
+            <p class="muted tiny">—</p>
+            {% endif %}
+        </div>
+        <div class="assistant-skills-col">
+            <h4 class="assistant-subhead">Nice to have</h4>
+            {% if job.nice_to_have_list and job.nice_to_have_list|length > 0 %}
+            <ul class="skills-bullets tight">
+                {% for s in job.nice_to_have_list %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+            {% else %}
+            <p class="muted tiny">—</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <h3 class="assistant-panel-title">Your fit</h3>
+    <div class="assistant-fit-grid">
+        <div>
+            <h4 class="assistant-subhead">Good fit</h4>
+            {% if job.fit_good_bullets and job.fit_good_bullets|length > 0 %}
+            <ul class="skills-bullets tight">
+                {% for s in job.fit_good_bullets %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+            {% else %}
+            <p class="muted tiny">—</p>
+            {% endif %}
+        </div>
+        <div>
+            <h4 class="assistant-subhead">Gaps / risks</h4>
+            {% if job.fit_gap_bullets and job.fit_gap_bullets|length > 0 %}
+            <ul class="skills-bullets tight">
+                {% for s in job.fit_gap_bullets %}<li>{{ s }}</li>{% endfor %}
+            </ul>
+            {% else %}
+            <p class="muted tiny">—</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<details class="panel apply-assist-panel">
+    <summary><strong>Apply Assist</strong> <span class="muted tiny">— fills safe fields only; you submit the application yourself</span></summary>
+    <div class="apply-assist-body" style="margin-top:12px">
+        <p class="muted small compact">
+            Apply Assist opens a <strong>Chromium</strong> window, fills basic fields (name, email, links, cover letter text, résumé file when the form matches),
+            and <strong>never</strong> clicks final Submit / Apply. Review every field, complete sensitive questions yourself, then submit on the employer site.
+        </p>
+        {% if not job.application_profile_ready %}
+        <p class="warn-inline">Complete <a href="{{ url_for('settings_application_profile') }}">Application profile</a> (full name + email) before starting.</p>
+        {% endif %}
+        <p class="muted tiny compact"><strong>Resolved URL:</strong>
+            {% if job.apply_assist_resolved_url %}<code class="tiny-code">{{ job.apply_assist_resolved_url }}</code>
+            {% else %}<span class="warn-inline">Add a job application link or paste the application page URL.</span>{% endif %}
+        </p>
+        <form method="post" action="{{ url_for('save_job_application_url', job_id=job.id) }}" class="manual-form slim-gap">
+            <label>Application / ATS page URL
+                <input type="url" name="application_url" value="{{ job.application_url_raw }}" placeholder="https://… (overrides discovered/job link for Apply Assist)" autocomplete="off">
+            </label>
+            {% if not job.is_deleted %}
+            <button type="submit" class="btn btn-ghost slim">Save application URL</button>
+            {% endif %}
+        </form>
+        {% if job.href_application_url %}
+        <p class="compact"><button type="button" class="btn btn-solid xs" data-open-external="{{ job.href_application_url }}">Open saved application URL</button></p>
+        {% endif %}
+        <p class="muted tiny" style="margin-top:10px"><strong>Status:</strong>
+            {% if job.apply_assist_session %}
+                {{ job.apply_assist_session.status_label }}
+                {% if job.apply_assist_session.started_at %}<span class="muted"> · started {{ job.apply_assist_session.started_at[:19] }}</span>{% endif %}
+            {% else %}
+                Not started
+            {% endif %}
+        </p>
+        {% if job.apply_assist_session and (job.apply_assist_session.fields_filled or job.apply_assist_session.fields_skipped or job.apply_assist_session.manual_required or job.apply_assist_session.error_message or job.apply_assist_session.fields_detected_count) %}
+        <dl class="fit-dl apply-assist-summary">
+            {% if job.apply_assist_session.fields_detected_count %}
+            <dt>Fields scanned</dt>
+            <dd>{{ job.apply_assist_session.fields_detected_count }}</dd>
+            {% endif %}
+            {% if job.apply_assist_session.fields_filled %}
+            <dt>Fields filled</dt>
+            <dd><ul class="compact-list">{% for x in job.apply_assist_session.fields_filled %}<li>{{ x }}</li>{% endfor %}</ul></dd>
+            {% endif %}
+            {% if job.apply_assist_session.fields_skipped %}
+            <dt>Skipped</dt>
+            <dd><ul class="compact-list">{% for x in job.apply_assist_session.fields_skipped[:12] %}<li>{{ x }}</li>{% endfor %}</ul></dd>
+            {% endif %}
+            {% if job.apply_assist_session.manual_required %}
+            <dt>Manual review</dt>
+            <dd><ul class="compact-list">{% for x in job.apply_assist_session.manual_required[:15] %}<li>{{ x }}</li>{% endfor %}</ul></dd>
+            {% endif %}
+            {% if job.apply_assist_session.error_message %}
+            <dt>Note</dt>
+            <dd class="warn-inline">{{ job.apply_assist_session.error_message }}</dd>
+            {% endif %}
+        </dl>
+        {% endif %}
+        {% if not job.is_deleted %}
+        <form method="post" action="{{ url_for('apply_assist_start', job_id=job.id) }}" class="inline-form" style="margin-top:12px"
+              onsubmit="return confirm('Apply Assist will open a browser window on this computer. It will not submit the form. Continue?');">
+            <button type="submit" class="btn btn-primary slim" {% if not job.application_profile_ready %}disabled{% endif %}>Start Apply Assist</button>
+        </form>
+        <p class="muted tiny">Save the application URL above first if it is not already set. Order: <strong>Save application URL</strong> → <strong>Start Apply Assist</strong>.</p>
+        <form method="post" action="{{ url_for('apply_assist_complete', job_id=job.id) }}" class="inline-form" style="margin-top:8px">
+            <button type="submit" class="btn btn-ghost xs">Mark Apply Assist completed manually</button>
+        </form>
+        {% if job.status != 'Applied' %}
+        <form method="post" action="{{ url_for('set_job_status', job_id=job.id) }}" class="inline-form" style="margin-top:8px">
+            <input type="hidden" name="status" value="Applied">
+            <input type="hidden" name="note" value="Marked Applied after manual submit (Apply Assist)">
+            <button type="submit" class="btn btn-solid xs">Mark as Applied</button>
+        </form>
+        {% endif %}
+        {% endif %}
+    </div>
+</details>
+
+<details class="panel application-packet-panel">
+    <summary><strong>Application packet</strong> <span class="muted tiny">— copy when automation cannot run</span></summary>
+    <div style="margin-top:12px">
+        <p class="muted small">Use these blocks in the employer form if Playwright is unavailable or the site blocks automation.</p>
+        {% if job.application_packet.profile_lines %}
+        <h4 class="packet-heading">Profile</h4>
+        <ul class="packet-lines">
+            {% for label, val in job.application_packet.profile_lines %}
+            <li><span class="muted">{{ label }}:</span> <span id="pk-{{ loop.index }}-wrap"><span class="packet-val" id="pk-{{ loop.index }}">{{ val }}</span>
+                <button type="button" class="btn btn-ghost xs" data-copy-target="#pk-{{ loop.index }}">Copy</button></span></li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <h4 class="packet-heading">Interest (suggested)</h4>
+        <pre class="packet-block" id="pk-interest">{{ job.application_packet.interest_suggestion }}</pre>
+        <button type="button" class="btn btn-ghost xs" data-copy-target="#pk-interest">Copy</button>
+        <h4 class="packet-heading" style="margin-top:14px">Skills match</h4>
+        <p class="packet-block plain" id="pk-skills">{{ job.application_packet.skills_match }}</p>
+        <button type="button" class="btn btn-ghost xs" data-copy-target="#pk-skills">Copy</button>
+        <h4 class="packet-heading" style="margin-top:14px">Cover letter draft</h4>
+        <pre class="packet-block" id="pk-cover">{{ job.application_packet.cover_letter_block }}</pre>
+        <button type="button" class="btn btn-ghost xs" data-copy-target="#pk-cover">Copy</button>
+        {% if job.application_packet.short_about_block %}
+        <h4 class="packet-heading" style="margin-top:14px">About me (from profile)</h4>
+        <pre class="packet-block" id="pk-about">{{ job.application_packet.short_about_block }}</pre>
+        <button type="button" class="btn btn-ghost xs" data-copy-target="#pk-about">Copy</button>
+        {% endif %}
+    </div>
+</details>
+
+<details class="panel app-tracking-panel">
+    <summary><strong>Application tracking</strong> <span class="muted tiny">(Gmail)</span></summary>
+    <div style="margin-top:12px">
+    {% if job.status != 'Applied' %}
+    <p class="muted">No application confirmation detected yet.</p>
+    {% else %}
+    <dl class="fit-dl">
+        <dt>Status</dt>
+        <dd>{{ job.status }}</dd>
+        <dt>Applied detected at</dt>
+        <dd>{{ job.applied_detected_at or '—' }}</dd>
+        <dt>Confirmation subject</dt>
+        <dd>{{ job.application_confirmation_subject or '—' }}</dd>
+        <dt>Confirmation sender</dt>
+        <dd>{{ job.application_confirmation_sender or '—' }}</dd>
+        <dt>Match confidence</dt>
+        <dd>{{ job.application_match_conf_display }}</dd>
+        <dt>Match reason</dt>
+        <dd>{{ job.application_match_reason or '—' }}</dd>
+    </dl>
+    {% if not job.application_confirmed %}
+    <p class="muted tiny">Applied status is set, but no Gmail confirmation is linked yet.</p>
+    {% endif %}
+    {% endif %}
+    </div>
+</details>
+
+<details class="panel">
+    <summary><strong>Links &amp; better text</strong></summary>
+    <div class="link-actions" style="margin-top:12px">
+        <div>
+            <p class="muted small tight">Job link</p>
+            {% if job.job_link_broken %}
+                <p class="warn-inline">Link looks invalid.</p>
+            {% endif %}
+            {% if job.href_job_link %}
+                <div class="link-row">
+                    <button type="button" class="btn btn-solid xs" data-open-external="{{ job.href_job_link }}" aria-label="Open job posting">Open job link</button>
+                    {% if job.copy_job_link_value %}
+                    <button type="button" class="btn btn-ghost xs" data-copy="{{ job.copy_job_link_value }}">Copy</button>
+                    {% endif %}
+                </div>
+            {% elif not job.job_link_present %}
+                <p class="muted tiny">No link stored.</p>
+            {% endif %}
+        </div>
+        <div>
+            <p class="muted small tight">Discovered page</p>
+            {% if job.discovered_link_broken %}
+                <p class="warn-inline">URL could not be opened.</p>
+            {% endif %}
+            {% if job.href_discovered %}
+                <div class="link-row">
+                    <button type="button" class="btn btn-solid xs" data-open-external="{{ job.href_discovered }}" aria-label="Open discovered page">Open page</button>
+                    {% if job.copy_discovered_value %}
+                    <button type="button" class="btn btn-ghost xs" data-copy="{{ job.copy_discovered_value }}">Copy</button>
+                    {% endif %}
+                </div>
+            {% elif not job.discovered_link_present %}
+                <p class="muted tiny">None yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% if job.manual_paste_notice %}
+        <p class="muted compact note-callout"><strong>Manual paste</strong> — add a URL above if you have one.</p>
+    {% endif %}
+    {% if not job.is_deleted %}
+    <form method="post" action="{{ url_for('research_job_posting_route', job_id=job.id) }}" class="inline-form" style="margin-top:12px">
+        <button type="submit" class="btn btn-primary slim">Research real job posting</button>
+    </form>
+    <p class="muted tiny">Finds the employer posting online and re-runs AI on richer text.</p>
+    {% endif %}
+
+    <h4 style="margin-top:16px">Paste link or full posting</h4>
+    <p class="muted small">Pasted description wins over URL fetch when both are provided. Same action as <strong>Improve this job</strong> when that box is shown.</p>
+    <form method="post" action="{{ url_for('improve_posting', job_id=job.id) }}" class="manual-form">
+        <label>Job posting URL (optional)
+            <input type="url" name="job_url" placeholder="https://…">
+        </label>
+        <label>Full job description
+            <textarea name="job_description" rows="6" placeholder="Paste the employer job description…"></textarea>
+        </label>
+        <button class="btn btn-primary slim" type="submit">Update job from link/description</button>
+    </form>
+    {% if not job.is_deleted %}
+    <form method="post" action="{{ url_for('force_ai_refresh_route', job_id=job.id) }}" class="manual-form slim-gap">
+        <button class="btn btn-ghost slim" type="submit">Re-run AI on stored text</button>
+    </form>
+    {% endif %}
+</details>
+
+<details class="panel ai-debug-panel">
+    <summary>Technical / debug</summary>
+    <div class="ai-debug-body muted small">
+        <p><strong>Source quality:</strong> <code>{{ job.effective_source_quality }}</code> <span class="muted tiny">(row: <code>{{ job.persist_debug.source_quality }}</code>)</span></p>
+        <p><strong>Discovered source:</strong> <code>{{ job.persist_debug.discovered_source or '—' }}</code></p>
+        <p><strong>discovered_text length:</strong> {{ job.persist_debug.discovered_text_len }} chars</p>
+        <p><strong>job_page_text length:</strong> {{ job.persist_debug.job_page_text_len }} chars</p>
+        <p><strong>SQLite path:</strong> <code>{{ job.persist_debug.db_path }}</code></p>
+        <p><strong>Embedded mode:</strong> {{ 'yes' if job.persist_debug.embedded else 'no' }}{% if job.persist_debug.data_dir %} · <strong>data dir</strong> <code>{{ job.persist_debug.data_dir }}</code>{% endif %}</p>
+        <p><strong>Skills / nice / tools:</strong> {{ job.ai_debug_req_count }} / {{ job.ai_debug_nice_count }} / {{ job.ai_debug_tools_count }}</p>
+        <p><strong>Text length (effective corpus hint):</strong> {{ job.ai_debug_desc_len }} chars</p>
+        <p><strong>Keyword fallback:</strong> {{ 'yes' if job.ai_debug_fallback_used else 'no' }}</p>
+    </div>
+</details>
+
+<section class="panel">
+    <h3>Category</h3>
+    <form method="post" action="{{ url_for('update_category_route', job_id=job.id) }}" class="category-form">
+        <label>Category
+            <select name="category" required>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == job.category %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="checkbox-field inline">
+            <input type="checkbox" name="category_lock" value="on" {% if job.category_locked_bool %}checked{% endif %}>
+            <span>Lock category from AI updates</span>
+        </label>
+        <button class="btn btn-solid" type="submit">Save category</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>Update workflow status</h3>
+    <form method="post" action="{{ url_for('set_job_status', job_id=job.id) }}" class="status-form">
+        <label>Status
+            <select name="status" required>
+                {% for status in statuses %}
+                <option value="{{ status }}" {% if status == job.status %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Note (optional)
+            <input type="text" name="note" placeholder="Short note for timeline">
+        </label>
+        <button class="btn btn-solid" type="submit">Save status</button>
+    </form>
+</section>
+
+<details class="panel technical-details">
+    <summary>Technical details</summary>
+    <div class="details-body">
+        {% if job.score_breakdown_technical %}
+        <section>
+            <h4>Scoring breakdown</h4>
+            <p class="muted small">{{ job.score_breakdown_technical }}</p>
+        </section>
+        {% endif %}
+        <section>
+            <h4>Engineering depth (classifier)</h4>
+            <p class="muted small">{{ job.engineering_level_required_display|capitalize }}</p>
+        </section>
+        <section>
+            <h4>Automation / AI relevance</h4>
+            <p>{{ job.automation_ai_relevance or '—' }}</p>
+        </section>
+        <section>
+            <h4>Gmail signal</h4>
+            <p><strong>Subject:</strong> {{ job.email_subject or '—' }}</p>
+            <p><strong>Snippet:</strong> {{ job.email_snippet or '—' }}</p>
+        </section>
+        <section>
+            <h4>Email body preview</h4>
+            <pre class="email-snippet">{{ job.email_body_preview or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Parsed description (email parser)</h4>
+            <pre class="email-snippet">{{ job.description or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Source quality</h4>
+            <p><span class="badge sq {{ job.sq_class }}">{{ job.sq_label }}</span> <code>{{ job.source_quality }}</code></p>
+        </section>
+        <section>
+            <h4>Discovery status &amp; log</h4>
+            <p><span class="badge disc-{{ job.discovery_class }}">{{ job.discovery_label }}</span></p>
+            <p class="muted small">{{ job.discovery_reason or '—' }}</p>
+            <p class="muted small"><strong>Discovered URL:</strong> {{ job.discovered_url or '—' }}</p>
+            <p class="muted small"><strong>Source tag:</strong> {{ job.discovered_source or '—' }}</p>
+        </section>
+        <section>
+            <h4>AI inputs / debug</h4>
+            <p class="muted small">{{ job.enrichment_sources_used or '—' }}</p>
+        </section>
+        <section>
+            <h4>Downloaded page text (trimmed)</h4>
+            <pre class="email-snippet">{{ job.job_page_preview or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Discovered/posted text preview</h4>
+            <pre class="email-snippet">{{ job.discovered_preview or '—' }}</pre>
+        </section>
+        <section>
+            <h4>Status history</h4>
+            <table>
+                <thead><tr><th>When</th><th>From</th><th>To</th><th>Note</th></tr></thead>
+                <tbody>
+                {% for item in history %}
+                    <tr><td>{{ item.changed_at }}</td><td>{{ item.old_status or '—' }}</td><td>{{ item.new_status }}</td><td>{{ item.note or '—' }}</td></tr>
+                {% else %}
+                    <tr><td colspan="4" class="muted">No history yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+</details>
+
+{% if not job.is_deleted %}
+<section class="panel danger-zone">
+    <h3>Delete job</h3>
+    <p class="muted small">Soft delete hides this card without touching Gmail payloads.</p>
+    <form method="post" action="{{ url_for('delete_job_route', job_id=job.id) }}" class="danger-form"
+          onsubmit="return confirm('Move this job to the recycle bin?');">
+        <button class="btn danger" type="submit">Delete job</button>
+    </form>
+</section>
+{% endif %}
+
+<script>
+(function () {
+  function isTauriShell() {
+    if (typeof window === 'undefined') return false;
+    if (typeof window.__TAURI_INTERNALS__ !== 'undefined' &&
+        typeof window.__TAURI_INTERNALS__.invoke === 'function') {
+      return true;
+    }
+    if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
+      return true;
+    }
+    return false;
+  }
+
+  function tauriInvoke(cmd, payload) {
+    if (window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function') {
+      return window.__TAURI_INTERNALS__.invoke(cmd, payload);
+    }
+    if (window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
+      return window.__TAURI__.core.invoke(cmd, payload);
+    }
+    return Promise.reject(new Error('Tauri IPC unavailable'));
+  }
+
+  function rememberLabel(btn) {
+    if (!btn.getAttribute('data-label-backup')) {
+      btn.setAttribute('data-label-backup', (btn.textContent || '').trim());
+    }
+    return btn.getAttribute('data-label-backup') || '';
+  }
+
+  function flashLabel(btn, text, durationMs) {
+    var original = rememberLabel(btn);
+    btn.textContent = text;
+    window.setTimeout(function () {
+      btn.textContent = original;
+    }, durationMs || 1800);
+  }
+
+  async function openExternal(url) {
+    try {
+      if (isTauriShell()) {
+        await tauriInvoke('plugin:opener|open_url', { url: url });
+        return true;
+      }
+      var opened = window.open(url, '_blank', 'noopener,noreferrer');
+      return !!opened;
+    } catch (_e) {
+      return false;
+    }
+  }
+
+  async function writeClipboard(text) {
+    var value = text || '';
+    if (!value.trim()) return false;
+    if (isTauriShell()) {
+      try {
+        await tauriInvoke('plugin:clipboard-manager|write_text', { text: value });
+        return true;
+      } catch (_e) {
+        /* continue to browser fallbacks */
+      }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch (_e) {
+        /* continue */
+      }
+    }
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (_e3) {
+      return false;
+    }
+  }
+
+  async function handleCopy(btn) {
+    rememberLabel(btn);
+    var txt = (btn.getAttribute('data-copy') || '').trim();
+    if (!txt) {
+      window.alert('Nothing to copy yet.');
+      return;
+    }
+    var ok = await writeClipboard(txt);
+    if (ok) {
+      flashLabel(btn, 'Copied!', 1800);
+      return;
+    }
+    flashLabel(btn, 'Copy failed — select manually', 2400);
+    try {
+      window.prompt('Copy failed — select manually', txt);
+    } catch (_e) { /* noop */ }
+  }
+
+  async function handleOpen(btn) {
+    rememberLabel(btn);
+    var url = (btn.getAttribute('data-open-external') || '').trim();
+    if (!url) return;
+    var ok = await openExternal(url);
+    if (!ok) {
+      window.alert('Could not open link');
+    }
+  }
+
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleCopy(btn);
+    });
+  });
+
+  document.querySelectorAll('[data-open-external]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleOpen(btn);
+    });
+  });
+
+  async function handleCopyTarget(btn) {
+    rememberLabel(btn);
+    var sel = (btn.getAttribute('data-copy-target') || '').trim();
+    var el = sel ? document.querySelector(sel) : null;
+    var txt = el ? (el.innerText || el.textContent || '').trim() : '';
+    if (!txt) {
+      window.alert('Nothing to copy yet.');
+      return;
+    }
+    var ok = await writeClipboard(txt);
+    if (ok) {
+      flashLabel(btn, 'Copied!', 1800);
+      return;
+    }
+    flashLabel(btn, 'Copy failed', 1800);
+    try {
+      window.prompt('Copy manually', txt);
+    } catch (_e) { /* noop */ }
+  }
+
+  document.querySelectorAll('[data-copy-target]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleCopyTarget(btn);
+    });
+  });
+})();
+</script>
+{% endblock %}

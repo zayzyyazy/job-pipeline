@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <h2>Settings</h2>
+    <p class="muted compact">OpenAI and Gmail stay on this machine — keys and tokens are never written to application logs.</p>
+    <p class="compact"><a href="{{ url_for('settings_application_profile') }}">Application profile</a> <span class="muted tiny">(Apply Assist)</span></p>
+</section>
+
+<section class="panel">
+    <h3>OpenAI</h3>
+    <form method="post" action="{{ url_for('settings_openai_save') }}" class="settings-form">
+        <label class="block-label">OpenAI API key
+            {% if openai_key_configured %}
+            <span class="muted tiny">Saved: <code>{{ openai_key_masked }}</code></span>
+            {% endif %}
+        </label>
+        <input type="password" name="openai_api_key" autocomplete="off"
+               placeholder="{% if openai_key_configured %}Enter new key to replace{% else %}sk-…{% endif %}">
+        <label class="block-label">OpenAI model</label>
+        <input type="text" name="openai_model" value="{{ openai_model_value }}" required>
+        <p class="muted tiny">Stored in local SQLite (<code>app_settings</code>). Leave API key blank to keep the current key.</p>
+        <button type="submit" class="btn btn-primary">Save OpenAI settings</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h3>Gmail connection</h3>
+    <ul class="settings-facts muted">
+        <li><strong>credentials.json</strong> present: {{ 'yes' if gmail.credentials_present else 'no' }}</li>
+        <li><strong>token.json</strong> present: {{ 'yes' if gmail.token_present else 'no' }}</li>
+        <li><strong>Gmail status:</strong>
+            {% if gmail.status_key == 'not_configured' %}Not configured{% elif gmail.status_key == 'needs_auth' %}Credentials found, not authenticated{% elif gmail.status_key == 'connected' %}Connected{% elif gmail.status_key == 'reconnect' %}Token expired / reconnect needed{% else %}{{ gmail.status_key }}{% endif %}
+        </li>
+        <li><strong>Account:</strong> {{ gmail.google_email or '—' }}</li>
+    </ul>
+    <p class="muted small">{{ gmail.user_message }}</p>
+    {% if not gmail.credentials_present %}
+    <p class="warn-inline">Download Google OAuth Desktop credentials and save as <code>credentials.json</code> in the project root.</p>
+    {% endif %}
+    <div class="settings-actions">
+        <form method="post" action="{{ url_for('settings_gmail_connect') }}" class="inline-form">
+            <button type="submit" class="btn btn-primary" {% if not gmail.credentials_present %}disabled{% endif %}>Connect Gmail</button>
+        </form>
+        <form method="post" action="{{ url_for('settings_gmail_reconnect') }}" class="inline-form">
+            <button type="submit" class="btn btn-ghost" {% if not gmail.credentials_present %}disabled{% endif %}>Reconnect Gmail</button>
+        </form>
+        <form method="post" action="{{ url_for('settings_gmail_disconnect') }}" class="inline-form"
+              onsubmit="return confirm('Remove token.json only? Your jobs and emails stay in SQLite.');">
+            <button type="submit" class="btn btn-ghost danger slim">Disconnect Gmail</button>
+        </form>
+    </div>
+    <p class="muted tiny">Connect / Reconnect opens the Google browser flow and may block this window until you finish.</p>
+</section>
+{% endblock %}

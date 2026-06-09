@@ -1,0 +1,247 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel manual-intake-cta-panel">
+    <div class="panel-head manual-intake-head">
+        <div>
+            <h2>Add a job yourself</h2>
+            <p class="muted compact">Paste a full posting URL (optional) and description — AI runs the same analysis as Gmail jobs.</p>
+        </div>
+        <a href="{{ url_for('manual_job_new') }}" class="btn btn-primary">+ Add job manually</a>
+    </div>
+</section>
+
+<section class="panel today-review-panel">
+    <div class="panel-head">
+        <h2>Today's review</h2>
+        <p class="muted compact">
+            Snapshot of your pipeline{% if review_focus %} <strong>(daily priority view)</strong>{% endif %}.
+        </p>
+    </div>
+    <div class="review-stats-grid" aria-label="Pipeline counts">
+        <div class="review-stat">
+            <span class="rs-val">{{ review_stats.strong_fit }}</span>
+            <span class="rs-lab">Strong fit</span>
+        </div>
+        <div class="review-stat">
+            <span class="rs-val">{{ review_stats.medium_fit }}</span>
+            <span class="rs-lab">Medium fit</span>
+        </div>
+        <div class="review-stat">
+            <span class="rs-val">{{ review_stats.saved }}</span>
+            <span class="rs-lab">Saved</span>
+        </div>
+        <div class="review-stat">
+            <span class="rs-val">{{ review_stats.applied }}</span>
+            <span class="rs-lab">Applied</span>
+        </div>
+        <div class="review-stat">
+            <span class="rs-val">{{ review_stats.detected_applications }}</span>
+            <span class="rs-lab">Detected from Gmail</span>
+        </div>
+        <div class="review-stat">
+            <span class="rs-val">{{ review_stats.needs_review }}</span>
+            <span class="rs-lab">Needs review (New)</span>
+        </div>
+        <div class="review-stat muted-stat">
+            <span class="rs-val">{{ review_stats.hidden_noisy }}</span>
+            <span class="rs-lab">Hidden / noisy</span>
+        </div>
+    </div>
+    <div class="dash-applied-scope" aria-label="Application filter">
+        <span class="muted tiny scope-label">Show</span>
+        <a class="chip link-chip{% if not applied_scope %} is-active{% endif %}" href="{{ url_for('dashboard') }}">All jobs</a>
+        <a class="chip link-chip{% if applied_scope == 'open' %} is-active{% endif %}" href="{{ url_for('dashboard', applied_scope='open') }}">Not applied</a>
+        <a class="chip link-chip{% if applied_scope == 'applied' %} is-active{% endif %}" href="{{ url_for('dashboard', applied_scope='applied') }}">Applied only</a>
+        <a class="chip link-chip{% if application_tracked %} is-active{% endif %}" href="{{ url_for('dashboard', application_tracked='1') }}">Gmail-detected</a>
+    </div>
+</section>
+
+<section class="panel filters-panel">
+    <h3 class="section-title">Filters</h3>
+    <form method="get" class="filters-grid" id="filter-form">
+        {% if application_tracked %}
+        <input type="hidden" name="application_tracked" value="1">
+        {% endif %}
+        {% if applied_scope %}
+        <input type="hidden" name="applied_scope" value="{{ applied_scope }}">
+        {% endif %}
+        <label class="full-span">Search
+            <input type="search" name="q" value="{{ search_q }}" placeholder="Title, company, location, skills, tools, posting summary, fit notes…">
+        </label>
+        <label>Status
+            <select name="status">
+                <option value="">All</option>
+                {% for status in statuses %}
+                <option value="{{ status }}" {% if status == status_filter %}selected{% endif %}>{{ status }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Source
+            <select name="source">
+                <option value="">All</option>
+                {% for source in sources %}
+                <option value="{{ source }}" {% if source == source_filter %}selected{% endif %}>{{ source }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Match (fit)
+            <select name="career_fit">
+                <option value="">All</option>
+                {% for cf in career_fit_choices %}
+                <option value="{{ cf }}" {% if cf == career_fit_filter %}selected{% endif %}>{{ cf | capitalize }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Location fit
+            <select name="location_fit">
+                <option value="">All</option>
+                {% for lf in location_fit_choices %}
+                <option value="{{ lf }}" {% if lf == location_fit_filter %}selected{% endif %}>{{ lf|replace('_',' ') }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Freshness <span class="muted tiny">(job_status)</span>
+            <select name="freshness">
+                <option value="">All</option>
+                {% for fv, flab in freshness_choices %}
+                <option value="{{ fv }}" {% if fv == freshness_filter %}selected{% endif %}>{{ flab }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Source quality
+            <select name="source_quality">
+                <option value="">All</option>
+                {% for sq in source_quality_choices %}
+                <option value="{{ sq }}" {% if sq == source_quality_filter %}selected{% endif %}>{{ sq | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Category
+            <select name="category">
+                <option value="">All</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if cat == category_filter %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Discovery
+            <select name="discovery_status">
+                <option value="">All</option>
+                {% for ds in discovery_choices %}
+                <option value="{{ ds }}" {% if ds == discovery_filter %}selected{% endif %}>{{ ds | replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="checkbox-field">
+            <span>Pinned only</span>
+            <input type="checkbox" name="pinned_only" value="1" {% if pinned_only %}checked{% endif %}>
+        </label>
+        <label class="checkbox-field">
+            <span>Show deleted</span>
+            <input type="checkbox" name="show_deleted" value="1" {% if show_deleted %}checked{% endif %}>
+        </label>
+        <label class="checkbox-field relax-toggle">
+            <span>Show hidden / noisy jobs</span>
+            <input type="checkbox" name="show_hidden" value="1" {% if show_hidden %}checked{% endif %}>
+        </label>
+        <div class="filter-actions">
+            <button class="btn btn-solid" type="submit">Apply</button>
+            <a class="btn btn-ghost" href="{{ url_for('dashboard') }}">Reset</a>
+        </div>
+        {% if review_focus %}
+        <p class="muted tiny full-span hint-line">
+            Showing <strong>pinned</strong>, <strong>Saved/Applied</strong>, or <strong>strong/medium fit</strong> roles in NRW / remote Germany / unclear,
+            with freshness <strong>fresh</strong>, <strong>active</strong>, or <strong>unset</strong>; excluding Ignored.
+            Tick <strong>Show hidden / noisy jobs</strong> for weak/reject/outside-region/old listings and <strong>low-confidence email intake</strong> (needs review / thin Gmail).
+        </p>
+        {% endif %}
+    </form>
+</section>
+
+<section class="panel cards-panel">
+    <div class="cards-head">
+        <h3>Jobs</h3>
+        <p class="muted compact">{{ jobs|length }} card(s){% if show_deleted %} · includes deleted{% endif %}</p>
+    </div>
+
+    {% if jobs %}
+    <div class="job-grid">
+        {% for job in jobs %}
+        <article class="job-card dash-card {{ job.card_tone }}{% if job.pinned_flag %} pinned-card{% endif %}{% if job.deleted_at %} deleted-card{% endif %}{% if job.dashboard_muted_low_fit %} muted-low-fit{% endif %}{% if job.needs_review_badge %} muted-weak-intake{% endif %}">
+            {% if job.pinned_flag %}<span class="pin-corner" aria-label="Pinned">📌</span>{% endif %}
+            <header class="card-top dash-card-top">
+                <div class="card-head-text">
+                    <a class="title-link line-clamp dash-title" href="{{ url_for('job_detail', job_id=job.id) }}">{{ job.display_title }}</a>
+                    <p class="muted company-clamp dash-company">{{ job.display_company }}</p>
+                </div>
+                <span class="status-chip sm">{{ job.status }}</span>
+                {% if job.needs_review_badge %}
+                <span class="badge needs-review-badge sm" title="Weak intake — open job to paste link or description">Needs review</span>
+                {% endif %}
+            </header>
+
+            <div class="meta-row dash-meta">
+                <span class="muted label">Where</span>
+                <span class="meta-value line-clamp sm dash-loc">{{ job.location or '—' }}</span>
+            </div>
+
+            <div class="meta-row slim-line dash-badges">
+                <span class="badge {{ job.location_badge }}">{{ job.loc_fit_short }}</span>
+                <span class="badge fit-{{ job.eff_fit_slug }}" title="Path match">{{ job.match_card_line }}</span>
+                <span class="badge sq {{ job.sq_class }}" title="Source: full posting, manual paste, email-only snapshot, or not found">{{ job.sq_label }}</span>
+                <span class="badge {{ job.fresh_class }}" title="Listing freshness">{{ job.fresh_label }}</span>
+            </div>
+
+            {% if job.application_tracked %}
+            <p class="muted tiny app-track-line">Applied detected from Gmail · {{ job.app_confirm_sender_short or '—' }} · {{ job.applied_detected_at_short }} · match {{ job.app_match_conf_display }}</p>
+            {% endif %}
+
+            {% if job.career_fit_line %}
+            <p class="career-fit-line muted line-clamp dash-reason">{{ job.career_fit_line }}</p>
+            {% endif %}
+
+            <div class="dash-chip-row">
+                {% for chip in job.dash_chips %}
+                <span class="chip chip-dash">{{ chip }}</span>
+                {% else %}
+                <span class="muted tiny dash-no-skills">No skills/tools listed yet</span>
+                {% endfor %}
+            </div>
+
+            <div class="meta-row reco-line dash-reco">
+                <span class="reco reco-{{ job.reco_class }}">{{ job.reco_display }}</span>
+                <span class="chip skinny dash-cat">{{ job.category_display }}</span>
+            </div>
+
+            <footer class="card-actions split dash-footer">
+                <div class="card-links">
+                    <a class="btn btn-solid ghost-like xs" href="{{ url_for('job_detail', job_id=job.id) }}">Open</a>
+                </div>
+                <div class="card-quick-forms">
+                    <form method="post" action="{{ url_for('quick_status', job_id=job.id) }}" class="inline-form">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <input type="hidden" name="status" value="Saved">
+                        <button type="submit" class="btn btn-quiet xs">Saved</button>
+                    </form>
+                    <form method="post" action="{{ url_for('quick_status', job_id=job.id) }}" class="inline-form">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <input type="hidden" name="status" value="Ignored">
+                        <button type="submit" class="btn btn-quiet xs">Ignored</button>
+                    </form>
+                    <form method="post" action="{{ url_for('toggle_pin_route', job_id=job.id) }}" class="inline-form">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button class="btn btn-quiet xs" type="submit">{% if job.pinned_flag %}Unpin{% else %}Pin{% endif %}</button>
+                    </form>
+                </div>
+            </footer>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h4>No jobs match this view.</h4>
+        <p class="muted">Try turning on “Show hidden / noisy jobs”, relaxing other filters, or clear with Reset.</p>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

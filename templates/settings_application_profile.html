@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel">
+    <h2>Application profile</h2>
+    <p class="muted compact">
+        Used only for <strong>Apply Assist</strong> on your machine. Values are stored in your local database — not sent to Job Pipeline servers.
+        The resume field is a <strong>path to a file on this computer</strong>; nothing is uploaded until you run Apply Assist in your own browser session.
+    </p>
+    <p class="muted tiny">Minimum to run Apply Assist: <strong>full name</strong> and a valid <strong>email</strong>.{% if profile_ready %} <span class="reco reco-apply">Profile ready.</span>{% endif %}</p>
+    <p><a href="{{ url_for('app_settings') }}">← Back to Settings</a></p>
+</section>
+
+<section class="panel">
+    <form method="post" class="manual-form application-profile-form">
+        <label>Full name
+            <input type="text" name="full_name" value="{{ profile.full_name }}" autocomplete="name">
+        </label>
+        <label>Email
+            <input type="email" name="email" value="{{ profile.email }}" autocomplete="email">
+        </label>
+        <label>Phone
+            <input type="text" name="phone" value="{{ profile.phone }}" autocomplete="tel">
+        </label>
+        <label>City / location
+            <input type="text" name="city" value="{{ profile.city }}" autocomplete="address-level2">
+        </label>
+        <label>LinkedIn URL
+            <input type="url" name="linkedin_url" value="{{ profile.linkedin_url }}" placeholder="https://…">
+        </label>
+        <label>GitHub URL
+            <input type="url" name="github_url" value="{{ profile.github_url }}" placeholder="https://…">
+        </label>
+        <label>Portfolio URL
+            <input type="url" name="portfolio_url" value="{{ profile.portfolio_url }}" placeholder="https://…">
+        </label>
+        <label>Resume file path (local)
+            <input type="text" name="resume_path" value="{{ profile.resume_path }}" placeholder="/Users/you/Documents/resume.pdf" spellcheck="false">
+        </label>
+        <label class="full-span">Default cover letter
+            <textarea name="cover_letter_default" rows="8" placeholder="Paste a reusable cover letter you can edit per employer…">{{ profile.cover_letter_default }}</textarea>
+        </label>
+        <label class="full-span">Work authorization note <span class="muted tiny">(for your own copy/paste — not auto-filled on legal/visa questions)</span>
+            <textarea name="work_authorization_note" rows="3" placeholder="e.g. EU citizen, eligible to work in Germany…">{{ profile.work_authorization_note }}</textarea>
+        </label>
+        <label class="full-span">Availability note
+            <textarea name="availability_note" rows="2" placeholder="Notice period, earliest start…">{{ profile.availability_note }}</textarea>
+        </label>
+        <label class="full-span">Short “about me” / intro
+            <textarea name="short_about" rows="4" placeholder="2–4 sentences for interest / about fields…">{{ profile.short_about }}</textarea>
+        </label>
+        <button type="submit" class="btn btn-primary">Save application profile</button>
+    </form>
+</section>
+{% endblock %}
